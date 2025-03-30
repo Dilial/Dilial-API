@@ -2,7 +2,7 @@
 
 [![npm version](https://badge.fury.io/js/dilial-api.svg)](https://badge.fury.io/js/dilial-api)
 
-**Dilial API** is a JavaScript API for managing Minecraft accounts and player data. It provides secure account storage with encryption, authentication with both Mojang and Microsoft accounts, and utilities for player skins and version information.
+**Dilial API** is a JavaScript API for managing Minecraft accounts and player data. It provides secure account storage with AES-256-GCM encryption, authentication with both Mojang and Microsoft accounts, and utilities for player skins and version information.
 
 ## Installation
 
@@ -19,6 +19,45 @@ npm install dilial-api
 ```
 
 ## Features
+
+### Configurable Account Storage
+
+You can configure where and how accounts are stored:
+
+```javascript
+const { configureAccountStorage } = require('dilial-api');
+
+// Use file system (default)
+configureAccountStorage({
+  type: 'file',
+  location: '/custom/path/to/store/accounts'
+});
+
+// Use Electron.js store
+const Store = require('electron-store');
+const electronStore = new Store();
+
+configureAccountStorage({
+  type: 'electron',
+  electronStore: electronStore
+});
+
+// Use memory only (no persistence)
+configureAccountStorage({
+  type: 'memory'
+});
+
+// Use custom storage implementation
+configureAccountStorage({
+  type: 'custom',
+  customHandler: {
+    read: () => myCustomReadFunction(),
+    write: (data) => myCustomWriteFunction(data),
+    readKey: () => myCustomReadKeyFunction(),
+    writeKey: (key) => myCustomWriteKeyFunction(key)
+  }
+});
+```
 
 ### Authentication
 
@@ -63,7 +102,7 @@ accounts.removeAccount('uuid-of-account');
 
 ### Player Skins
 
-Get player skin data:
+Get player skin data with efficient caching:
 
 ```javascript
 const { getPlayerSkin, getPlayerHead } = require('dilial-api');
@@ -74,6 +113,12 @@ console.log('Skin URL:', skinData.skinUrl);
 console.log('Cape URL:', skinData.capeUrl);
 console.log('Is slim model:', skinData.isSlimModel);
 
+// Force refresh cached data
+const freshData = await getPlayerSkin({ 
+  username: 'Notch',
+  forceRefresh: true 
+});
+
 // Get just the player head
 const headData = await getPlayerHead({ username: 'Notch' });
 console.log('2D head:', headData.headImageUrl);
@@ -82,7 +127,7 @@ console.log('3D head:', headData.head3dUrl);
 
 ### Minecraft Versions
 
-Get Minecraft version information:
+Get Minecraft version information with built-in caching:
 
 ```javascript
 const { getVersions } = require('dilial-api');
@@ -95,11 +140,26 @@ const releaseVersions = await getVersions({ type: 'release' });
 
 // Get only snapshots
 const snapshots = await getVersions({ type: 'snapshot' });
+
+// Force fresh data
+const freshVersions = await getVersions({ forceRefresh: true });
 ```
 
 ## Security
 
-The account system uses AES-256-GCM encryption to store authentication data. The encryption key is stored separately with appropriate file permissions. No sensitive data is stored in plain text.
+The account system uses AES-256-GCM encryption with the following security features:
+
+- Encryption keys are securely generated and stored
+- Tokens and sensitive data are never exposed in plain text
+- When using file storage, proper file permissions are set (0600)
+- Custom storage options allow for advanced security implementations
+
+## Performance
+
+- Fast API responses with intelligent caching
+- Adjustable cache duration for version lists and skin data
+- Timeout protection for all network requests
+- Memory-efficient storage of frequently used data
 
 ## License
 

@@ -9,5 +9,6 @@ module.exports = {
   getPlayerSkin,
   getPlayerHead,
   accounts: accountManager,
-  auth: authService
+  auth: authService,
+  configureAccountStorage: accountManager.configureStorage
 };

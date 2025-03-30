@@ -3,47 +3,27 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const ACCOUNTS_DIR = path.join(os.homedir(), '.minecraft-launcher-accounts');
-const ACCOUNTS_FILE = path.join(ACCOUNTS_DIR, 'accounts.json');
-const ENCRYPTION_KEY_FILE = path.join(ACCOUNTS_DIR, '.key');
-const ALGORITHM = 'aes-256-gcm';
-
 let encryptionKey = null;
 let accounts = [];
 let activeAccount = null;
+let storageConfig = {
+    type: 'file',
+    location: path.join(os.homedir(), '.minecraft-launcher-accounts'),
+    electronStore: null,
+    customHandler: null,
+    initialized: false
+};
 
-function initializeAccountStorage() {
-    try {
-        if (!fs.existsSync(ACCOUNTS_DIR)) {
-            fs.mkdirSync(ACCOUNTS_DIR, { recursive: true, mode: 0o700 });
-        }
-        
-        if (!fs.existsSync(ENCRYPTION_KEY_FILE)) {
-            const newKey = crypto.randomBytes(32);
-            fs.writeFileSync(ENCRYPTION_KEY_FILE, newKey, { mode: 0o600 });
-            encryptionKey = newKey;
-        } else {
-            encryptionKey = fs.readFileSync(ENCRYPTION_KEY_FILE);
-        }
-        
-        fs.chmodSync(ENCRYPTION_KEY_FILE, 0o600);
-        
-        if (fs.existsSync(ACCOUNTS_FILE)) {
-            const encryptedData = fs.readFileSync(ACCOUNTS_FILE, 'utf8');
-            if (encryptedData.trim()) {
-                accounts = JSON.parse(decrypt(encryptedData));
-                activeAccount = accounts.find(acc => acc.active) || null;
-            }
-        } else {
-            fs.writeFileSync(ACCOUNTS_FILE, encrypt(JSON.stringify([])), { mode: 0o600 });
-        }
-        
-        fs.chmodSync(ACCOUNTS_FILE, 0o600);
-        return true;
-    } catch (error) {
-        console.error("Error initializing account storage:", error.message);
-        return false;
-    }
+const ALGORITHM = 'aes-256-gcm';
+const ACCOUNTS_FILE_NAME = 'accounts.json';
+const ENCRYPTION_KEY_FILE_NAME = '.key';
+
+function getAccountsFilePath() {
+    return path.join(storageConfig.location, ACCOUNTS_FILE_NAME);
+}
+
+function getKeyFilePath() {
+    return path.join(storageConfig.location, ENCRYPTION_KEY_FILE_NAME);
 }
 
 function encrypt(text) {
@@ -87,20 +67,199 @@ function decrypt(encryptedJson) {
     }
 }
 
+function readEncryptedData() {
+    try {
+        switch (storageConfig.type) {
+            case 'file':
+                if (fs.existsSync(getAccountsFilePath())) {
+                    const encryptedData = fs.readFileSync(getAccountsFilePath(), 'utf8');
+                    if (encryptedData.trim()) {
+                        return encryptedData;
+                    }
+                }
+                break;
+            case 'electron':
+                if (storageConfig.electronStore && storageConfig.electronStore.has('accounts')) {
+                    return storageConfig.electronStore.get('accounts');
+                }
+                break;
+            case 'custom':
+                if (storageConfig.customHandler && typeof storageConfig.customHandler.read === 'function') {
+                    return storageConfig.customHandler.read();
+                }
+                break;
+        }
+        return null;
+    } catch (error) {
+        console.error("Error reading encrypted data:", error.message);
+        return null;
+    }
+}
+
+function writeEncryptedData(encryptedData) {
+    try {
+        switch (storageConfig.type) {
+            case 'file':
+                fs.writeFileSync(getAccountsFilePath(), encryptedData, { mode: 0o600 });
+                break;
+            case 'electron':
+                if (storageConfig.electronStore) {
+                    storageConfig.electronStore.set('accounts', encryptedData);
+                }
+                break;
+            case 'custom':
+                if (storageConfig.customHandler && typeof storageConfig.customHandler.write === 'function') {
+                    storageConfig.customHandler.write(encryptedData);
+                }
+                break;
+        }
+        return true;
+    } catch (error) {
+        console.error("Error writing encrypted data:", error.message);
+        return false;
+    }
+}
+
+function readEncryptionKey() {
+    try {
+        switch (storageConfig.type) {
+            case 'file':
+                if (fs.existsSync(getKeyFilePath())) {
+                    return fs.readFileSync(getKeyFilePath());
+                }
+                break;
+            case 'electron':
+                if (storageConfig.electronStore && storageConfig.electronStore.has('encryptionKey')) {
+                    const keyStr = storageConfig.electronStore.get('encryptionKey');
+                    return Buffer.from(keyStr, 'hex');
+                }
+                break;
+            case 'custom':
+                if (storageConfig.customHandler && typeof storageConfig.customHandler.readKey === 'function') {
+                    return storageConfig.customHandler.readKey();
+                }
+                break;
+        }
+        return null;
+    } catch (error) {
+        console.error("Error reading encryption key:", error.message);
+        return null;
+    }
+}
+
+function writeEncryptionKey(key) {
+    try {
+        switch (storageConfig.type) {
+            case 'file':
+                fs.writeFileSync(getKeyFilePath(), key, { mode: 0o600 });
+                fs.chmodSync(getKeyFilePath(), 0o600);
+                break;
+            case 'electron':
+                if (storageConfig.electronStore) {
+                    const keyStr = key.toString('hex');
+                    storageConfig.electronStore.set('encryptionKey', keyStr);
+                }
+                break;
+            case 'custom':
+                if (storageConfig.customHandler && typeof storageConfig.customHandler.writeKey === 'function') {
+                    storageConfig.customHandler.writeKey(key);
+                }
+                break;
+        }
+        return true;
+    } catch (error) {
+        console.error("Error writing encryption key:", error.message);
+        return false;
+    }
+}
+
+function generateNewEncryptionKey() {
+    return crypto.randomBytes(32);
+}
+
 function saveAccounts() {
     try {
+        if (storageConfig.type === 'memory') {
+            return true;
+        }
+        
         const encryptedData = encrypt(JSON.stringify(accounts));
-        fs.writeFileSync(ACCOUNTS_FILE, encryptedData, { mode: 0o600 });
-        return true;
+        return writeEncryptedData(encryptedData);
     } catch (error) {
         console.error("Error saving accounts:", error.message);
         return false;
     }
 }
 
+function initializeAccountStorage() {
+    try {
+        if (storageConfig.initialized) return true;
+        
+        if (storageConfig.type === 'file') {
+            if (!fs.existsSync(storageConfig.location)) {
+                fs.mkdirSync(storageConfig.location, { recursive: true, mode: 0o700 });
+            }
+        }
+        
+        let existingKey = readEncryptionKey();
+        
+        if (!existingKey) {
+            encryptionKey = generateNewEncryptionKey();
+            writeEncryptionKey(encryptionKey);
+        } else {
+            encryptionKey = existingKey;
+        }
+        
+        const encryptedData = readEncryptedData();
+        
+        if (encryptedData) {
+            try {
+                accounts = JSON.parse(decrypt(encryptedData));
+                activeAccount = accounts.find(acc => acc.active) || null;
+            } catch (error) {
+                console.error("Error parsing account data, resetting accounts:", error.message);
+                accounts = [];
+                activeAccount = null;
+                saveAccounts();
+            }
+        } else {
+            accounts = [];
+            activeAccount = null;
+            saveAccounts();
+        }
+        
+        storageConfig.initialized = true;
+        return true;
+    } catch (error) {
+        console.error("Error initializing account storage:", error.message);
+        return false;
+    }
+}
+
+function configureStorage(config = {}) {
+    if (config.type && ['file', 'electron', 'memory', 'custom'].includes(config.type)) {
+        storageConfig.type = config.type;
+    }
+    
+    if (config.location && typeof config.location === 'string') {
+        storageConfig.location = config.location;
+    }
+    
+    if (config.electronStore) {
+        storageConfig.electronStore = config.electronStore;
+    }
+    
+    if (config.customHandler) {
+        storageConfig.customHandler = config.customHandler;
+    }
+    
+    storageConfig.initialized = false;
+    return initializeAccountStorage();
+}
+
 async function addAccount(authData) {
     try {
-        if (!encryptionKey) {
+        if (!storageConfig.initialized) {
             if (!initializeAccountStorage()) {
                 throw new Error("Could not initialize account storage");
             }
@@ -142,7 +301,7 @@ async function addAccount(authData) {
 
 function removeAccount(uuid) {
     try {
-        if (!encryptionKey) {
+        if (!storageConfig.initialized) {
             if (!initializeAccountStorage()) {
                 throw new Error("Could not initialize account storage");
             }
@@ -173,7 +332,7 @@ function removeAccount(uuid) {
 
 function getAccounts() {
     try {
-        if (!encryptionKey) {
+        if (!storageConfig.initialized) {
             if (!initializeAccountStorage()) {
                 throw new Error("Could not initialize account storage");
             }
@@ -194,7 +353,7 @@ function getAccounts() {
 
 function getActiveAccount() {
     try {
-        if (!encryptionKey) {
+        if (!storageConfig.initialized) {
             if (!initializeAccountStorage()) {
                 throw new Error("Could not initialize account storage");
             }
@@ -219,7 +378,7 @@ function getActiveAccount() {
 
 function setActiveAccount(uuid) {
     try {
-        if (!encryptionKey) {
+        if (!storageConfig.initialized) {
             if (!initializeAccountStorage()) {
                 throw new Error("Could not initialize account storage");
             }
@@ -241,7 +400,7 @@ function setActiveAccount(uuid) {
 
 function getAuthData(uuid = null) {
     try {
-        if (!encryptionKey) {
+        if (!storageConfig.initialized) {
             if (!initializeAccountStorage()) {
                 throw new Error("Could not initialize account storage");
             }
@@ -271,7 +430,7 @@ function getAuthData(uuid = null) {
 
 function updateAuthData(uuid, authData) {
     try {
-        if (!encryptionKey) {
+        if (!storageConfig.initialized) {
             if (!initializeAccountStorage()) {
                 throw new Error("Could not initialize account storage");
             }
@@ -321,5 +480,6 @@ module.exports = {
     getActiveAccount,
     setActiveAccount,
     getAuthData,
-    updateAuthData
+    updateAuthData,
+    configureStorage
 }; 

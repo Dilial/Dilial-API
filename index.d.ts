@@ -7,6 +7,7 @@ declare module "dilial-api" {
 
     export interface VersionOptions {
         type?: string;
+        forceRefresh?: boolean;
     }
 
     export interface PlayerSkin {
@@ -32,6 +33,7 @@ declare module "dilial-api" {
 
     export interface PlayerSkinOptions {
         username: string;
+        forceRefresh?: boolean;
     }
 
     export interface PlayerHead {
@@ -67,6 +69,18 @@ declare module "dilial-api" {
         state: string;
     }
 
+    export interface StorageConfig {
+        type?: 'file' | 'electron' | 'memory' | 'custom';
+        location?: string;
+        electronStore?: any;
+        customHandler?: {
+            read?: () => string | null;
+            write?: (data: string) => boolean;
+            readKey?: () => Buffer | null;
+            writeKey?: (key: Buffer) => boolean;
+        };
+    }
+
     export function getVersions(options?: VersionOptions): Promise<Version[] | { error: string }>;
     export function getPlayerSkin(options: PlayerSkinOptions): Promise<PlayerSkin | { error: string }>;
     export function getPlayerHead(options: PlayerSkinOptions): Promise<PlayerHead | { error: string }>;
@@ -89,4 +103,6 @@ declare module "dilial-api" {
         validateToken(uuid?: string): Promise<boolean>;
         logoutAccount(uuid?: string): Promise<boolean>;
     };
+
+    export function configureAccountStorage(config: StorageConfig): boolean;
 }
