@@ -45,6 +45,39 @@ declare module "dilial-api" {
         error?: string;
     }
 
+    export interface PlayerCape {
+        uuid: string;
+        username: string;
+        hasCape: boolean;
+        capeUrl?: string;
+        capeRenderUrl?: string;
+        message?: string;
+        timestamp: string;
+        error?: string;
+    }
+
+    export interface SkinUpdateOptions {
+        skinPath: string;
+        slim?: boolean;
+        uuid?: string;
+    }
+
+    export interface CapeUpdateOptions {
+        capeId: string;
+        uuid?: string;
+    }
+
+    export interface CapeDeleteOptions {
+        uuid?: string;
+    }
+
+    export interface UpdateResult {
+        success: boolean;
+        message?: string;
+        error?: string;
+        timestamp?: string;
+    }
+
     export interface Account {
         uuid: string;
         username: string;
@@ -84,6 +117,7 @@ declare module "dilial-api" {
     export function getVersions(options?: VersionOptions): Promise<Version[] | { error: string }>;
     export function getPlayerSkin(options: PlayerSkinOptions): Promise<PlayerSkin | { error: string }>;
     export function getPlayerHead(options: PlayerSkinOptions): Promise<PlayerHead | { error: string }>;
+    export function getPlayerCape(options: PlayerSkinOptions): Promise<PlayerCape | { error: string }>;
 
     export const accounts: {
         addAccount(authData: AuthData): Promise<boolean>;
@@ -102,6 +136,12 @@ declare module "dilial-api" {
         refreshMicrosoftToken(uuid: string): Promise<AuthData>;
         validateToken(uuid?: string): Promise<boolean>;
         logoutAccount(uuid?: string): Promise<boolean>;
+    };
+
+    export const skinUpdater: {
+        updatePlayerSkin(options: SkinUpdateOptions): Promise<UpdateResult>;
+        updatePlayerCape(options: CapeUpdateOptions): Promise<UpdateResult>;
+        deletePlayerCape(options: CapeDeleteOptions): Promise<UpdateResult>;
     };
 
     export function configureAccountStorage(config: StorageConfig): boolean;

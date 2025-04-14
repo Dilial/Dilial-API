@@ -125,6 +125,57 @@ console.log('2D head:', headData.headImageUrl);
 console.log('3D head:', headData.head3dUrl);
 ```
 
+### Player Capes
+
+Get a player's cape data:
+
+```javascript
+const { getPlayerCape } = require('dilial-api');
+
+// Get player's cape information
+const capeData = await getPlayerCape({ username: 'Notch' });
+
+if (capeData.hasCape) {
+  console.log('Cape URL:', capeData.capeUrl);
+  console.log('Cape Render URL:', capeData.capeRenderUrl);
+} else {
+  console.log(capeData.message); // "Player does not have a cape"
+}
+```
+
+### Update Skin and Cape
+
+You can update the skin and cape for authenticated players:
+
+```javascript
+const { skinUpdater } = require('dilial-api');
+
+// Update player skin from file (supports both classic and slim models)
+const skinResult = await skinUpdater.updatePlayerSkin({
+  skinPath: './path/to/skin.png',
+  slim: true // Use slim model (Alex), false for classic (Steve)
+});
+
+// Update player skin from URL
+const skinUrlResult = await skinUpdater.updatePlayerSkin({
+  skinPath: 'https://example.com/skin.png'
+});
+
+// Update player cape (using cape ID)
+const capeResult = await skinUpdater.updatePlayerCape({
+  capeId: 'MineCon2016'
+});
+
+// Remove a player's cape
+const capeDeleteResult = await skinUpdater.deletePlayerCape();
+
+// Use with a specific account (not the active one)
+const specificAccountResult = await skinUpdater.updatePlayerSkin({
+  skinPath: './custom_skin.png',
+  uuid: 'player-uuid-here'
+});
+```
+
 ### Minecraft Versions
 
 Get Minecraft version information with built-in caching:
