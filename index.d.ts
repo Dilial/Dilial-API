@@ -56,19 +56,57 @@ declare module "dilial-api" {
         error?: string;
     }
 
+    export interface MojangCredentials {
+        username: string;
+        password: string;
+        type?: 'mojang';
+    }
+
+    export interface DirectAuthResult {
+        success: boolean;
+        accessToken?: string;
+        clientToken?: string;
+        uuid?: string;
+        username?: string;
+        error?: string;
+    }
+
     export interface SkinUpdateOptions {
         skinPath: string;
         slim?: boolean;
         uuid?: string;
+        accessToken?: string;
+        credentials?: MojangCredentials;
     }
 
     export interface CapeUpdateOptions {
         capeId: string;
         uuid?: string;
+        accessToken?: string;
+        credentials?: MojangCredentials;
     }
 
     export interface CapeDeleteOptions {
         uuid?: string;
+        accessToken?: string;
+        credentials?: MojangCredentials;
+    }
+
+    export interface CapeListOptions {
+        uuid?: string;
+        accessToken?: string;
+        credentials?: MojangCredentials;
+    }
+
+    export interface AvailableCapes {
+        success: boolean;
+        capes: Array<{
+            id: string;
+            name?: string;
+            state?: string;
+        }>;
+        error?: string;
+        timestamp?: string;
     }
 
     export interface UpdateResult {
@@ -142,6 +180,8 @@ declare module "dilial-api" {
         updatePlayerSkin(options: SkinUpdateOptions): Promise<UpdateResult>;
         updatePlayerCape(options: CapeUpdateOptions): Promise<UpdateResult>;
         deletePlayerCape(options: CapeDeleteOptions): Promise<UpdateResult>;
+        getAvailableCapes(options: CapeListOptions): Promise<AvailableCapes>;
+        directAuthenticate(credentials: MojangCredentials): Promise<DirectAuthResult>;
     };
 
     export function configureAccountStorage(config: StorageConfig): boolean;

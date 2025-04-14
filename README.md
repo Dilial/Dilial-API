@@ -176,6 +176,58 @@ const specificAccountResult = await skinUpdater.updatePlayerSkin({
 });
 ```
 
+#### Direct Authentication Mode
+
+You can also update skins and capes without using the API's internal authentication system by providing direct credentials or an access token:
+
+```javascript
+const { skinUpdater } = require('dilial-api');
+
+// Authenticate directly with Mojang credentials (without storing in the account system)
+const authResult = await skinUpdater.directAuthenticate({
+  username: 'your_email@example.com',
+  password: 'your_password'
+});
+
+if (authResult.success) {
+  console.log('Authentication successful!');
+  console.log('Access Token:', authResult.accessToken);
+  
+  // Use the access token directly
+  const skinResult = await skinUpdater.updatePlayerSkin({
+    skinPath: './path/to/skin.png',
+    accessToken: authResult.accessToken
+  });
+}
+
+// Provide credentials directly in one step
+const skinResult = await skinUpdater.updatePlayerSkin({
+  skinPath: './path/to/skin.png',
+  credentials: {
+    username: 'your_email@example.com',
+    password: 'your_password'
+  }
+});
+
+// Update a cape with direct credentials
+const capeResult = await skinUpdater.updatePlayerCape({
+  capeId: 'MineCon2016',
+  credentials: {
+    username: 'your_email@example.com',
+    password: 'your_password'
+  }
+});
+
+// Get available capes for the authenticated user
+const availableCapes = await skinUpdater.getAvailableCapes({
+  accessToken: 'your_access_token'  // Or provide credentials object
+});
+
+if (availableCapes.success) {
+  console.log('Available capes:', availableCapes.capes);
+}
+```
+
 ### Minecraft Versions
 
 Get Minecraft version information with built-in caching:

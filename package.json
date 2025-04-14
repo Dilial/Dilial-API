@@ -1,6 +1,6 @@
 {
   "name": "dilial-api",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "API designed to simplify the creation of Minecraft launchers",
   "main": "index.js",
   "types": "index.d.ts",
